@@ -2,8 +2,6 @@ Flask-Cors==3.0.10
 Flask-MySQL==1.5.2
 Flask-MySQLdb==1.0.1
 Flask-WTF==1.1.1
-ipython @ file:///C:/Windows/TEMP/abs_45b5zb1l7q/croots/recipe/ipython_1659529855872/work
-ipython-genutils @ file:///tmp/build/80754af9/ipython_genutils_1606773439826/work
 mysql-connector-python==8.0.32
 mysqlclient==2.1.1
 notify-py==0.3.42
