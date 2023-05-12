@@ -1,0 +1,302 @@
+{% extends 'layout.html' %}
+
+{% block title %}Consulta{% endblock %}
+
+{% block content %}
+<form method="POST" enctype="multipart/form-data" id="main-form">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.min.js"></script>
+
+<link rel="stylesheet" href="/static/css/style.css">
+
+<div class="container">
+  <div class="row">
+    <div class="col-md-12">
+      <div class="chat-container">
+        <form method="POST" id="main-form">
+          <div class="chat-input-container">
+            <input type="text" class="chat-input" name="question" placeholder="Escribe aquí tu mensaje">
+            <button class="btn btn-sm btn-primary" type="submit" id="button-send-text" style="font-size: 12px; width: 15%;">Enviar</button>
+            <button class="btn btn-sm btn-primary" name="audio" type="button" id="button-record-voice" style="font-size: 12px; width: 15%">Conversar</button>
+            <input type="checkbox" id="muteCheckbox" name="muteCheckbox" onchange="saveMuteState()"><label for="muteCheckbox">Sin Voz</label>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-12">
+      <div class="chat-history-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Fecha y hora</th>
+              <th> </th>
+              <th>Mensaje</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if chat %}
+            {% for message in chat %}
+            <tr>
+              <td>{{ message.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+              {% if message.speaker == "user" %}
+              <td><span class="user">Yo:</span></td>
+              {% else %}
+              <td><span class="bot">Robot:</span></td>
+              {% endif %}
+              <td><span class="text">{{ message.text }}</span></td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr>
+              <td colspan="3">
+                <div class="message">
+                  <span class="bot">No hay conversaciones.</span>
+                </div>
+              </td>
+            </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-12">
+      <form method="POST">
+        <div class="buttons-container mt-2">
+          <button class="btn btn-sm btn-primary" type="submit" name="Cargar_conversacion" value="true" style="font-size: 12px;">Cargar conversación</button>
+          <button class="btn btn-sm btn-warning" type="submit" name="Borrar_conversacion" value="true" style="font-size: 12px;">Borrar conversación</button>
+        </div>
+     </form>
+    </div>
+  </div>
+
+
+  <div class="row">
+    <div class="col-md-12">
+      <label for="voice-selection">Selecciona una voz:</label>
+      <select name="voice-selection" id="voice-selection">
+        <!-- Opciones de voz aquí -->
+      </select>
+
+      <label for="language-selection">Selecciona un idioma:</label>
+      <select name="language-selection" id="language-selection">
+        <!-- Opciones de idioma aquí -->
+      </select>
+
+      <input type="submit" value="Guardar">
+    </div>
+
+</div>
+
+
+
+
+{% block scripts %}
+<script>
+
+// Controlador de eventos para el botón mute
+  function saveMuteState() {
+    var muteCheckbox = document.getElementById("muteCheckbox");
+    localStorage.setItem("muteState", muteCheckbox.checked);
+  }
+
+  function loadMuteState() {
+    var muteCheckbox = document.getElementById("muteCheckbox");
+    var muteState = localStorage.getItem("muteState");
+  
+    if (muteState !== null) {
+      muteCheckbox.checked = JSON.parse(muteState);
+    }
+  }
+
+  window.addEventListener("DOMContentLoaded", loadMuteState);
+
+// Controlador de eventos para el botón de envío de texto
+
+
+document.getElementById('button-send-text').addEventListener('click', async (event) => {
+  event.preventDefault();
+
+  const form = document.querySelector('#main-form');
+  const formData = new FormData(form);
+
+  try {
+    const response = await fetch('/consulta', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const responseResult = await response.json();
+    //console.log("Respuesta JSON:", responseResult);
+
+    if (responseResult.status === 'success') {
+      await speak(responseResult.answer);
+      location.reload();
+    }
+  } catch (error) {
+    console.error("Ocurrió un error al procesar la respuesta JSON:", error);
+    // Aquí puedes mostrar un mensaje de error al usuario o manejar el error de otra manera
+  }
+});
+
+// Controlador de eventos para el botón de grabación de voz
+document.getElementById('button-record-voice').addEventListener('click', async (event) => {
+  event.preventDefault();
+  await handleAudioRecording();
+});
+
+async function handleTextSubmission(formData) {
+  try {
+      const response = await fetch('/consulta', {
+          method: 'POST',
+          body: formData,
+      });
+
+      const responseResult = await response.json();
+      console.log("Respuesta JSON:", responseResult);
+
+      if (responseResult.status === 'success') {
+          await speak(responseResult.answer);
+          location.reload();
+      }
+  } catch (error) {
+      console.error("Ocurrió un error al procesar la respuesta JSON:", error);
+      // Aquí puedes mostrar un mensaje de error al usuario o manejar el error de otra manera
+  }
+
+}
+
+async function handleAudioRecording() {
+  const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const mediaRecorder = new MediaRecorder(mediaStream);
+  const audioChunks = [];
+
+  mediaRecorder.addEventListener('dataavailable', (event) => {
+      audioChunks.push(event.data);
+  });
+
+  mediaRecorder.addEventListener('stop', async () => {
+      const audioBlob = new Blob(audioChunks);
+      const formData = new FormData();
+      formData.append('audio', audioBlob);
+      formData.append('question', ''); // Agrega esta línea para evitar el KeyError: 'question'
+      formData.set('audio', 'true'); // Agrega esta línea para indicar que es una grabación de audio
+
+      await handleTextSubmission(formData);
+  });
+
+    // Agregar la siguiente línea para desmarcar el checkbox de silenciar parlante
+    document.getElementById("muteCheckbox").checked = false;
+    saveMuteState(); // Guarda el estado del checkbox en el localStorage
+
+      // Oculta el mensaje de grabación cuando se haya completado la grabación
+  document.getElementById("recordingMessage").style.display = "none";
+
+  mediaRecorder.start();
+  setTimeout(() => {
+      mediaRecorder.stop();
+  }, 8000); // Grabación de 5 segundos
+}
+
+function speak(text) {
+
+    // Comprueba si el checkbox está seleccionado
+    var isMuted = document.getElementById("muteCheckbox").checked;
+
+    // Si está seleccionado, no reproduzcas la voz y retorna una promesa resuelta
+    if (isMuted) {
+      return Promise.resolve();
+    }
+  
+    // Si no está seleccionado, continúa con la reproducción de la voz
+  return new Promise((resolve) => {
+      const msg = new SpeechSynthesisUtterance(text);
+      msg.lang = 'es-ES';
+      msg.volume = 1;
+
+      msg.onend = function () {
+          resolve();
+      };
+
+      window.speechSynthesis.speak(msg);
+  });
+}
+
+// Controladores de eventos para los botones de envío de texto y grabación de voz
+function addEventListeners() {
+  document.getElementById('button-send-text').addEventListener('click', async (event) => {
+    // ...
+  });
+
+  document.getElementById('button-record-voice').addEventListener('click', async (event) => {
+    // ...
+  });
+}
+
+// Carga de voces, idiomas y controladores de eventos al inicio
+document.addEventListener('DOMContentLoaded', function() {
+  loadVoices();
+  loadLanguages();
+  addEventListeners();
+});
+
+
+
+{% if voices is defined %}
+  // Recibe las voces desde Flask
+  const voices = {{ voices | tojson | safe }};
+  
+  // Función para cargar las voces disponibles
+  function loadVoices() {
+    // Encuentra el elemento select en el DOM
+    const voiceSelect = document.getElementById('voice-selection');
+
+    // Llena la combo box con las voces
+    voices.forEach(voice => {
+      const option = document.createElement('option');
+      option.textContent = voice.name;
+      option.value = voice.code;
+      voiceSelect.appendChild(option);
+    });
+  }
+{% endif %}
+
+{% if languages is defined %}
+  // Recibe los idiomas desde Flask
+  const languages = {{ languages | tojson | safe }};
+  
+  // Función para cargar los idiomas disponibles
+  function loadLanguages() {
+    // Encuentra el elemento select en el DOM
+    const languageSelect = document.getElementById('language-selection');
+
+    // Llena la combo box con los idiomas
+    languages.forEach(language => {
+      const option = document.createElement('option');
+      option.textContent = language.nombre;
+      option.value = language.codigo;
+      languageSelect.appendChild(option);
+    });
+    
+  }
+{% endif %}
+
+
+document.getElementById('save-settings').addEventListener('click', (event) => {
+  event.preventDefault();
+  document.getElementById('settings-form').submit();
+});
+
+
+
+</script>
+{% endblock scripts %}
+
+
+{% endblock %}

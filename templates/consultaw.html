@@ -1,0 +1,139 @@
+{% extends 'layout.html' %}
+
+{% block title %}Consulta{% endblock %}
+
+{% block content %}
+
+
+<div id="status" style="background-color:gray; color:white; padding:5px;">Listo para grabar...</div>
+<form method="POST" enctype="multipart/form-data">
+<link rel="stylesheet" type="text/css" href="style.css">
+
+<div class="container">
+  <div class="row">
+    <div class="col-md-12">
+      <div class="chat-container">
+        <form method="POST">
+          <div class="chat-input-container">
+            <input type="text" class="chat-input" name="question" placeholder="Escribe aquí tu mensaje">
+            <button class="btn btn-sm btn-primary" type="submit" id="button-addon2" style="font-size: 12px; width: 15%;">Enviar</button>
+            <button class="btn btn-sm btn-primary" type="submit" name="Grabar_audio" value="true" style="font-size: 12px; width: 15%">Grabar audio</button>
+            <input type="file" accept="audio/*" capture="microphone" id="audio-data" name="audio-data" style="display: none">
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-12">
+      <div class="chat-history-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Fecha y hora</th>
+              <th> </th>
+              <th>Mensaje</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if chat %}
+            {% for message in chat %}
+            <tr>
+              <td>{{ message.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+              {% if message.speaker == "user" %}
+              <td><span class="user">Yo:</span></td>
+              {% else %}
+              <td><span class="bot">Robot:</span></td>
+              {% endif %}
+              <td><span class="text">{{ message.text }}</span></td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr>
+              <td colspan="3">
+                <div class="message">
+                  <span class="bot">No hay conversaciones.</span>
+                </div>
+              </td>
+            </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-12">
+      <form method="POST">
+        <div class="buttons-container mt-2">
+          <button class="btn btn-sm btn-primary" type="submit" name="Cargar_conversacion" value="true" style="font-size: 12px;">Cargar conversación</button>
+          <button class="btn btn-sm btn-warning" type="submit" name="Borrar_conversacion" value="true" style="font-size: 12px;">Borrar conversación</button>
+        </div>
+     </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  console.log({{ chat }});
+  const voiceBtn = document.getElementById('voice-btn');
+  const audioData = document.getElementById('audio-data');
+
+  voiceBtn.addEventListener('click', function() {
+    audioData.click();
+  });
+</script>
+
+<script>
+  const chatInput = document.querySelector('.chat-input');
+  const audioButton = document.querySelector('#audio-button');
+  const audioData = document.querySelector('#audio-data');
+  const chatStatus = document.querySelector('#status');
+
+  audioButton.addEventListener('click', function() {
+    audioData.click();
+  });
+
+  chatInput.addEventListener('focus', function() {
+    chatStatus.style.backgroundColor = '#6CCFF6';
+    chatStatus.textContent = 'Escribiendo...';
+  });
+
+  chatInput.addEventListener('blur', function() {
+    chatStatus.style.backgroundColor = '#43C654';
+    chatStatus.textContent = 'En espera...';
+  });
+
+  function handleRecording() {
+    chatStatus.style.backgroundColor = '#F6B26C';
+    chatStatus.textContent = 'Grabando...';
+  }
+
+  function handleProcessing() {
+    chatStatus.style.backgroundColor = '#F6606C';
+    chatStatus.textContent = 'Procesando...';
+  }
+
+  function handlePlaying() {
+    chatStatus.style.backgroundColor = '#6CCFF6';
+    chatStatus.textContent = 'Reproduciendo...';
+  }
+
+  const socket = io.connect('http://localhost:5000');
+
+  socket.on('status', function(data) {
+    if (data.state === 'recording') {
+      handleRecording();
+    } else if (data.state === 'processing') {
+      handleProcessing();
+    } else if (data.state === 'playing') {
+      handlePlaying();
+    }
+  });
+</script>
+
+
+
+{% endblock %}

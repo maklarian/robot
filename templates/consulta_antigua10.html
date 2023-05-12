@@ -1,0 +1,202 @@
+{% extends 'layout.html' %}
+
+{% block title %}Consulta{% endblock %}
+
+{% block content %}
+
+<form method="POST" enctype="multipart/form-data">
+
+  <div class="container">
+    <div class="row">
+      <div class="col-md-12">
+        <div class="chat-container">
+          <div class="chat-input-container">
+            <input type="text" class="chat-input" name="question" placeholder="Escribe aquí tu mensaje">
+            <button class="btn btn-sm btn-primary" type="submit" id="button-addon2" style="font-size: 12px; width: 15%;">Enviar</button>
+            <button class="btn btn-sm btn-primary" type="button" id="grabar_audio" style="font-size: 12px; width: 15%">Grabar audio</button>
+            <input type="file" accept="audio/*" capture="microphone" id="audio-data" name="audio-data" style="display: none">
+          </div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="row">
+      <div class="col-md-12">
+        <div class="voice-selection-container">
+          <label for="seleccion_voz">Selecciona la voz del Robot:</label>
+          <select name="voice" id="seleccion_voz">
+            {% for voice in session['voice_options'] %}
+            <option value="{{ voice['id'] }}">{{ voice['name'] }}</option>
+            {% endfor %}
+          </select>
+          <button type="button" id="boton_voz" title="Cambiar voz">Cambiar voz</button>
+        </div>
+      </div>
+    </div>
+  
+
+  
+  </div>
+
+  <div class="row">
+    <div class="col-md-12">
+      <div class="chat-history-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Fecha y hora</th>
+              <th> </th>
+              <th>Mensaje</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if chat %}
+            {% for message in chat %}
+            <tr>
+              <td>{{ message.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+              {% if message.speaker == "user" %}
+              <td><span class="user">Yo:</span></td>
+              {% else %}
+              <td><span class="bot">Robot:</span></td>
+              {% endif %}
+              <td><span class="text">{{ message.text }}</span></td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr>
+              <td colspan="3">
+                <div class="message">
+                  <span class="bot">No hay conversaciones.</span>
+                </div>
+              </td>
+            </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  
+  <div class="col-md-12">
+    <div class="buttons-container mt-2">
+      <button class="btn btn-sm btn-primary" type="submit" name="Cargar_conversacion" value="true" style="font-size: 12px;">Cargar conversación</button>
+      <button class="btn btn-sm btn-warning" type="submit" name="Borrar_conversacion" value="true" style="font-size: 12px;">Borrar conversación</button>
+    </div>
+</div>
+
+
+</form>
+
+<script>
+  function hablar(mensaje) {
+    const seleccion_voz = document.querySelector('#seleccion_voz');
+    const voz_seleccionada = seleccion_voz.value;
+
+    const synth = window.speechSynthesis;
+    const utterance = new SpeechSynthesisUtterance(mensaje);
+    const voices = synth.getVoices();
+
+    utterance.voice = voices.find(voice => voice.voiceURI === voz_seleccionada);
+    utterance.rate = 1.5; // Ajusta la tasa de palabras por minuto
+
+    synth.speak(utterance);
+  }
+
+  document.querySelector("form[method='POST']").addEventListener("submit", function(event) {
+    event.preventDefault(); // detener la acción por defecto del navegador
+    const form = new FormData(event.target);
+    fetch("/consulta", {
+      method: "POST",
+      body: form
+    })
+      .then(response => response.json())
+      .then(data => {
+        // manejar la respuesta del servidor
+        const respuesta = data.answer;
+        const chatHistory = document.querySelector('.chat-history-container table tbody');
+        const newRow = chatHistory.insertRow();
+        const dateCell = newRow.insertCell();
+        const speakerCell = newRow.insertCell();
+        const textCell = newRow.insertCell();
+        dateCell.textContent = new Date().toLocaleString();
+        speakerCell.textContent = 'Yo';
+        textCell.textContent = form.get('question');
+        chatHistory.appendChild(newRow);
+        hablar(respuesta);
+      })
+      .catch(error => {
+        console.error("Error al enviar la pregunta y recibir la respuesta:", error);
+      });
+  });
+
+  function reproducirRespuesta(texto) {
+    const utterance = new SpeechSynthesisUtterance(texto);
+    const vozSeleccionada = document.getElementById("seleccion_voz").value;
+    utterance.voice = speechSynthesis.getVoices().find(voice => voice.voiceURI === vozSeleccionada);
+    speechSynthesis.speak(utterance);
+  }
+
+  document.querySelector("form[method='POST']").addEventListener("submit", function(event) {
+    event.preventDefault(); // detener la acción por defecto del navegador
+    const form = new FormData(event.target);
+    fetch("/consulta", {
+      method: "POST",
+      body: form
+    })
+      .then(response => response.json())
+      .then(data => {
+        // manejar la respuesta del servidor
+      })
+      .catch(error => {
+        console.error("Error al enviar la pregunta y recibir la respuesta:", error);
+      });
+  });
+
+  document.getElementById("grabar_audio").addEventListener("click", function() {
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(stream => {
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.start();
+  
+        const audioChunks = [];
+        mediaRecorder.addEventListener("dataavailable", event => {
+          audioChunks.push(event.data);
+        });
+  
+        mediaRecorder.addEventListener("stop", () => {
+          const audioBlob = new Blob(audioChunks);
+          const audioUrl = URL.createObjectURL(audioBlob);
+          const audio = new Audio(audioUrl);
+          audio.play();
+  
+          const formData = new FormData();
+          formData.append("audio-data", audioBlob);
+  
+          fetch("/consulta", {
+            method: "POST",
+            body: formData
+          })
+            .then(response => response.json())
+            .then(data => {
+              reproducirRespuesta(data.answer);
+            })
+            .catch(error => {
+              console.error("Error al enviar el audio y recibir la respuesta:", error);
+            });
+        });
+  
+        setTimeout(() => {
+          mediaRecorder.stop();
+        }, 3000);
+      });
+  });
+</script>
+
+
+
+{% endblock %}
+
+
+
+

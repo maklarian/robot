@@ -1,0 +1,66 @@
+{% extends 'layout.html' %}
+{% block title %}Consulta{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h1 class="text-center my-5">¡Hablemos!</h1>
+  <div class="row">
+    <div class="col-md-8">
+      <div class="chat-container">
+        <div class="chat-area">
+          {% for message in chat %}
+          <div class="message">{{ message }}</div>
+          {% endfor %}
+        </div>
+        <form method="POST">
+          <div class="input-group mb-3">
+            <input type="text" class="form-control" name="question" placeholder="Escribe aquí tu mensaje" aria-label="Escribe aquí tu mensaje" aria-describedby="button-addon2">
+            <button class="btn btn-primary" type="submit" id="button-addon2"><i class="fas fa-paper-plane"></i></button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="voice-panel">
+        <button id="voice-btn" class="btn btn-primary"><i class="fas fa-microphone"></i></button>
+        <button id="speak-btn" class="btn btn-primary"><i class="fas fa-volume-up"></i></button>
+        <select class="form-select my-2" id="language-select">
+          <option value="en-US">Inglés</option>
+          <option value="es-ES">Español</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const speechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new speechRecognition();
+  const voiceBtn = document.getElementById('voice-btn');
+  const speakBtn = document.getElementById('speak-btn');
+  const languageSelect = document.getElementById('language-select');
+  const chatArea = document.querySelector('.chat-area');
+
+  recognition.lang = languageSelect.value;
+
+  voiceBtn.addEventListener('click', () => {
+    recognition.start();
+  });
+
+  recognition.addEventListener('result', (event) => {
+    const transcript = event.results[0][0].transcript;
+    document.querySelector('input[name=question]').value = transcript;
+  });
+
+  speakBtn.addEventListener('click', () => {
+    const utterance = new SpeechSynthesisUtterance(chatArea.textContent);
+    utterance.lang = languageSelect.value;
+    speechSynthesis.speak(utterance);
+  });
+
+  languageSelect.addEventListener('change', () => {
+    recognition.lang = languageSelect.value;
+  });
+</script>
+
+{% endblock %}

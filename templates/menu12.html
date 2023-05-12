@@ -1,0 +1,19 @@
+{% extends 'layout.html' %}
+{% block title %} Menú {% endblock %}
+
+{% block content %}
+    <div class="container">
+        <h1 class="text-center">Bienvenido(a) {{ session['name'] }}</h1>
+        <p class="text-center">Selecciona una opción:</p>
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <ul class="list-group">
+                    <li class="list-group-item"><a href="{{ url_for('consulta') }}">Conversar con el robot</a></li>
+                     <li class="list-group-item"><a href="/aprender">Aprender con el robot</a></li>
+                    <li class="list-group-item"><a href="/juegos">Juegos con el robot</a></li>
+                    <li class="list-group-item"><a href="/terapia">Terapia con el robot</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+{% endblock %}
