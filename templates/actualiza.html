@@ -1,0 +1,24 @@
+{% extends 'layout.html' %} 
+{% block title %} Registro {% endblock %}
+
+{% block content %}
+    <div class="principal">
+        <div class="login">
+
+
+            <form method="POST" action="/actualiza">
+                <div class="form-group">
+                    <label>Idioma:</label>
+                    <select class="form-input" name="idioma">
+                        <option value="Español"></option>
+                        {% for idi in idioma %}
+                        <option value="{{idi.nom_idioma}}">{{ idi.nom_idioma }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <input type="submit" value="Actualizar">
+ 
+            </form>
+        </div>
+    </div>
+{% endblock %}

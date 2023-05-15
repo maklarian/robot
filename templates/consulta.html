@@ -1,0 +1,220 @@
+{% extends 'layout.html' %}
+
+{% block title %}Consulta{% endblock %}
+
+{% block content %}
+<form method="POST" enctype="multipart/form-data" id="main-form">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<link rel="stylesheet" href="/static/css/style.css">
+
+<div class="container">
+  <div class="row">
+    <div class="col-md-12">
+      <div class="chat-container">
+        <form method="POST" id="main-form">
+          <div class="chat-input-container">
+            <input type="text" class="chat-input" name="question" placeholder="Escribe aquí tu mensaje">
+            <button class="btn btn-sm btn-primary" type="submit" id="button-send-text" style="font-size: 12px; width: 15%;">Enviar</button>
+            <button class="btn btn-sm btn-primary" name="audio" type="button" id="button-record-voice" style="font-size: 12px; width: 15%">Conversar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-md-12">
+      <div class="chat-history-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Fecha y hora</th>
+              <th> </th>
+              <th>Mensaje</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if chat %}
+            {% for message in chat %}
+            <tr>
+              <td>{{ message.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+              {% if message.speaker == "user" %}
+              <td><span class="user">Yo:</span></td>
+              {% else %}
+              <td><span class="bot">Robot:</span></td>
+              {% endif %}
+              <td><span class="text">{{ message.text }}</span></td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr>
+              <td colspan="3">
+                <div class="message">
+                  <span class="bot">No hay conversaciones.</span>
+                </div>
+              </td>
+            </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-12">
+      <form method="POST">
+        <div class="buttons-container mt-2">
+          <button class="btn btn-sm btn-primary" type="submit" name="Cargar_conversacion" value="true" style="font-size: 12px;">Cargar conversación</button>
+          <button class="btn btn-sm btn-warning" type="submit" name="Borrar_conversacion" value="true" style="font-size: 12px;">Borrar conversación</button>
+          <p class="selected-language">Idioma seleccionado: {{ session['idioma'] }}</p>
+        </div>
+     </form>
+    </div>
+    <div class="row">
+      <div class="col-md-15">
+        <div id="listening-message" class="listening-message">
+          <p>Escuchando... hable claro por el micrófono...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+{% block scripts %}
+
+<script>
+
+// Controlador de eventos para el botón de envío de texto
+
+
+
+document.getElementById('button-send-text').addEventListener('click', async (event) => {
+  event.preventDefault();
+
+  const form = document.querySelector('#main-form');
+  const formData = new FormData(form);
+
+  try {
+    const response = await fetch('/consulta', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const responseResult = await response.json();
+    console.log("Respuesta JSON:", responseResult);
+
+    if (responseResult.status === 'success') {
+      await speak(responseResult.answer);
+      location.reload();
+    }
+  } catch (error) {
+    console.error("Ocurrió un error al procesar la respuesta JSON:", error);
+    // Aquí puedes mostrar un mensaje de error al usuario o manejar el error de otra manera
+  }
+});
+
+// Controlador de eventos para el botón de grabación de voz
+document.getElementById('button-record-voice').addEventListener('click', async (event) => {
+  event.preventDefault();
+  await handleAudioRecording();
+});
+
+async function handleTextSubmission(formData) {
+  try {
+      const response = await fetch('/consulta', {
+          method: 'POST',
+          body: formData,
+      });
+
+      const responseResult = await response.json();
+      console.log("Respuesta JSON:", responseResult);
+
+      if (responseResult.status === 'success') {
+          await speak(responseResult.answer);
+          location.reload();
+      }
+  } catch (error) {
+      console.error("Ocurrió un error al procesar la respuesta JSON:", error);
+      // Aquí puedes mostrar un mensaje de error al usuario o manejar el error de otra manera
+  }
+}
+
+async function handleAudioRecording() {
+
+  console.time("Tiempo de activación del micrófono");
+  const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const mediaRecorder = new MediaRecorder(mediaStream);
+  const audioChunks = [];
+
+  // Función que simula la espera mientras el micrófono se habilita
+  async function waitForMic(mediaStream) {
+    return new Promise((resolve) => {
+      const audioTrack = mediaStream.getAudioTracks()[0];
+      const onAudioReady = () => {
+        if (audioTrack.readyState === 'live') {
+          resolve();
+        } else {
+          setTimeout(onAudioReady, 20);
+        }
+      };
+      onAudioReady();
+    });
+  }
+  
+  // Esperar un segundo (puedes ajustar el tiempo según sea necesario)
+ 
+  await waitForMic(mediaStream);
+
+    // Agrega un setTimeout para mostrar el mensaje después de un desfase
+    setTimeout(() => {
+      document.getElementById("listening-message").style.display = "block";
+    }, 9000); // Ajusta este valor para controlar el desfase en milisegundos
+
+
+  console.timeEnd("Tiempo de activación del micrófono");
+
+
+  mediaRecorder.addEventListener('dataavailable', (event) => {
+      audioChunks.push(event.data);
+  });
+
+  mediaRecorder.addEventListener('stop', async () => {
+
+      const audioBlob = new Blob(audioChunks);
+      const formData = new FormData();
+      formData.append('audio', audioBlob);
+      formData.append('question', ''); // Agrega esta línea para evitar el KeyError: 'question'
+      formData.set('audio', 'true'); // Agrega esta línea para indicar que es una grabación de audio
+
+      await handleTextSubmission(formData);
+
+  });
+
+  mediaRecorder.start();
+  setTimeout(() => {
+      mediaRecorder.stop();
+  }, 10000); // Grabación de 10 segundos
+}
+
+function speak(text) {
+  return new Promise((resolve) => {
+      const msg = new SpeechSynthesisUtterance(text);
+      //msg.lang = 'es-ES';
+      msg.volume = 1;
+
+      msg.onend = function () {
+          resolve();
+      };
+
+      window.speechSynthesis.speak(msg);
+      
+  });
+}
+
+</script>
+{% endblock scripts %}
+
+
+{% endblock %}
