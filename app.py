@@ -15,11 +15,23 @@ import pygame
 from io import BytesIO
 
 from flask import jsonify
+from pydub import AudioSegment
+from pydub.playback import play
+from audioplayer import AudioPlayer
+from playsound import playsound
+
+from pydub import AudioSegment
+import sounddevice as sd
+from scipy.io import wavfile
+
+import os
+import uuid
+
 # coding=utf-8
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Configurar la API de OpenAI
-openai.api_key = "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"
+openai.api_key = "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"
 
 # Configurar la base de datos de MySQL
 app = Flask(__name__)
@@ -29,8 +41,7 @@ app.secret_key = 'miguelklariancontreras2510196110'
 
 # Configurar el motor de texto a voz
 engine = pyttsx3.init()
-#voices = engine.getProperty('voices')
-#engine.setProperty('voice', voices[0].id) # 0 = male, 1 = female
+
 engine.setProperty('rate', 170)
 engine.setProperty('volume', 2.0)  # Agregar esta línea para aumentar el volumen
 r= sr.Recognizer()
@@ -40,7 +51,6 @@ r.pause_threshold = 0.8
 r.energy_threshold = 4000
 r.dynamic_energy_threshold= False
 
-#conexion = mysql.connector.connect(user='gpt3',password='makc2510', host= '34.176.80.44',database='mygpt3', port='3306')
 
 app.config['MYSQL_HOST'] = '127.0.0.1'
 app.config['MYSQL_USER'] = 'root'
@@ -57,8 +67,23 @@ mysql = mysql.connector.connect(
 
 fecha = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
+def text_to_speech(id, text,lang):
+    filename = f'respuesta_{id}.wav'  # Agrega el ID de usuario al nombre del archivo
+    filepath = os.path.join('static/audio', filename)
 
-#session.clear()
+    tts = gTTS(text, lang=lang)
+    tts.save(filepath)
+
+  
+    return filepath
+
+def play_audio(filepath):
+    audio = AudioSegment.from_mp3(filepath)
+    audio.export('temp.wav', format='wav')
+    fs, data = wavfile.read('temp.wav')
+    sd.play(data, fs)
+    sd.wait()
+
 
 # Ruta para borrar la conversación actual
 @app.route('/borrar-conversacion', methods=['POST'])
@@ -141,7 +166,6 @@ def actualiza():
         session['idioma'] = idioma
         return redirect(url_for('consulta'))
     
- # Ruta para el formulario de inicio de sesión
 
 
 @app.route('/login', methods= ["GET", "POST"])
@@ -162,12 +186,13 @@ def login():
         cur.close()
 
         if user and user['password'] == password:
+            session['id'] = user['id']
             session['name'] = user['name']
             session['email'] = user['email']
             session['tipo'] = user['id_tip_usu']
             session['idioma'] = user['idioma']
             session.pop('temp_var', None)
-            return render_template("menu.html")
+            return redirect(url_for("consulta"))
                        
         else:
             error = "Email o clave incorrecta"
@@ -190,12 +215,13 @@ def consulta():
         return redirect(url_for('login'))
 
     email = session['email']
+    id = session['id']
     fecha = datetime.now()
     data = []
     audio = None
     answer = None
     lang=""
-    print(lang)
+
     
     if session['idioma'] == 'Español':
             lang='es'
@@ -214,8 +240,7 @@ def consulta():
             lang='fr'
 
         pygame.mixer.init()
-        #tts = gTTS(text, lang='en', tld='com', gender='male')  # cambiar a voz masculina y cambiar el idioma a inglés
-        #tts.VoiceSelectionParams(language_code=language_code, name=voice_name)
+
         tts = gTTS(text, lang=lang)
         fp = BytesIO()
         tts.write_to_fp(fp)
@@ -262,12 +287,10 @@ def consulta():
         if session['idioma'] == 'Frances':
                 lang='fr'
                 
-        print(lang)
+      
         
-        
-        # Obtener la pregunta ingresada por el usuario
         question = request.form['question']
-        # Agregar la pregunta a la conversación
+
         cur = mysql.cursor(dictionary=True)
         cur.execute("INSERT INTO conversaciones (email, text, speaker, created_at) VALUES (%s, %s, %s, %s)", (email, question, 'user', fecha))
         mysql.commit()
@@ -288,14 +311,20 @@ def consulta():
 
         except:
             answer = "Lo siento, no he podido entender la pregunta"
-
-        # Agregar la respuesta del chatbot a la conversación
+            
+ 
         cur = mysql.cursor(dictionary=True)
         cur.execute("INSERT INTO conversaciones (email, text, speaker, created_at) VALUES (%s, %s, %s, %s)", (email, answer, 'bot', fecha))
         mysql.commit()
         cur.close()
         
-        speak(answer)
+        
+        audio_filepath = text_to_speech(id,answer,lang)
+ 
+        play_audio(audio_filepath)
+        
+        
+        #speak(answer)
         
         cur = mysql.cursor(dictionary=True)
         cur.execute("SELECT * FROM conversaciones WHERE email = %s ORDER BY id DESC", (email,))
@@ -306,9 +335,7 @@ def consulta():
         return jsonify({"status": "success", "message": "Consulta procesada", "answer": answer})
         
         return render_template('consulta.html', chat=data)
-    
-     
-     
+      
    
     if request.method == 'POST' and request.form.get('audio') == 'true':
         
@@ -388,15 +415,13 @@ def consulta():
                
             else:
                 
-                #language = request.form.get('language')
-                print(lang)
                 if text =="":
                     stop = True # Establece la variable "stop" en True para salir del ciclo while
                     break
                     
                 
                 text = r.recognize_google(audio, language=lang)
-                #text = r.recognize_google(audio)
+
                 print(text)
                 start_time = time.time() # Reinicia el temporizador
                 
@@ -437,10 +462,14 @@ def consulta():
                     stop = True # Establece la variable "stop" en True para salir del ciclo while
                     break
            
-        
-                speak(answer)
+                audio_filepath = text_to_speech(id,answer,lang)
+ 
+                play_audio(audio_filepath)
+
+
+                
+                #speak(answer)
             
-        #answer=""   
         return jsonify({"status": "success", "message": "Consulta procesada", "answer": answer})
     
     
@@ -449,7 +478,7 @@ def consulta():
     data = cur.fetchall()
     cur.close()
     
-            
+           
     if not data:
         data = []
         return render_template('consulta.html', chat=data)
