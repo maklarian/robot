@@ -139,6 +139,25 @@ async function handleTextSubmission(formData) {
       console.error("Ocurrió un error al procesar la respuesta JSON:", error);
       // Aquí puedes mostrar un mensaje de error al usuario o manejar el error de otra manera
   }
+
+  async function handleTextSubmission(formData) {
+    try {
+      const response = await fetch('/consulta', { method: 'POST', body: formData });
+      const { audio_url } = await response.json();
+      await playAudio(audio_url);
+    } catch (error) {
+      console.error("Ocurrió un error al procesar la respuesta JSON:", error);
+    }
+  }
+  
+  function playAudio(url) {
+    return new Promise((resolve) => {
+      const audio = new Audio(url);
+      audio.onended = resolve;
+      audio.play();
+    });
+  }
+
 }
 
 async function handleAudioRecording() {
